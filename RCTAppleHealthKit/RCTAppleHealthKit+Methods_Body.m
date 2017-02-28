@@ -102,7 +102,8 @@
 - (void)body_deleteWeight:(NSDictionary *)input callback:(RCTResponseSenderBlock)callback
 {
     NSDate *startDate = [RCTAppleHealthKit dateFromOptions:input key:@"startDate" withDefault:nil];
-    NSDate *endDate = [RCTAppleHealthKit dateFromOptions:input key:@"endDate" withDefault:[NSDate date]];
+    NSDate *endDateOld = [RCTAppleHealthKit dateFromOptions:input key:@"endDate" withDefault:[NSDate date]];
+    NSDate *endDate = [NSDate dateWithTimeInterval:1.0 sinceDate:endDateOld];
     
     if(startDate == nil || endDate == nil){
         callback(@[RCTMakeError(@"startDate and endDate are required in options", nil, nil)]);
@@ -110,45 +111,28 @@
     }
     
     HKQuantityType *type = [HKQuantityType quantityTypeForIdentifier:HKQuantityTypeIdentifierBodyMass];
-    
-    // the predicate used to execute the query
-    NSPredicate *queryPredicate = [HKSampleQuery predicateForSamplesWithStartDate:startDate endDate:endDate options:HKQueryOptionNone];
-    
-    // prepare the query
-    HKSampleQuery *query = [[HKSampleQuery alloc] initWithSampleType:type predicate:queryPredicate limit:100 sortDescriptors:nil resultsHandler:^(HKSampleQuery * _Nonnull query, NSArray<__kindof HKSample *> * _Nullable results, NSError * _Nullable error) {
-        
-        if (error) {
-            
-            NSLog(@"Error: %@", error.description);
-            
-            callback(@[RCTMakeError(@"An error occured deleting the weights sample", error.description, nil)]);
-            
-        } else {
-            
-            // now that we retrieved the samples, we can delete it/them
-            [self.healthStore deleteObject:[results firstObject] withCompletion:^(BOOL success, NSError * _Nullable error) {
-                
-                if (success) {
-                    
-                    NSLog(@"Successfully deleted entries from health kit");
-                    
-                    callback(@[[NSNull null], @"success"]);
-                    
-                } else {
-                    
-                    NSLog(@"Error: %@", error.description);
-                    
-                    callback(@[RCTMakeError(@"An error occured deleting the weights sample", error.description, nil)]);
-                    
-                    
-                }
-            }];
-            
+    NSPredicate *predicate = [HKQuery predicateForSamplesWithStartDate:startDate endDate:endDate options:HKQueryOptionNone];
+    HKSampleQuery *query = [[HKSampleQuery alloc] initWithSampleType:type predicate:predicate limit:HKObjectQueryNoLimit sortDescriptors:nil resultsHandler:^(HKSampleQuery *query, NSArray *results, NSError *error) {
+        if (!results) {
+            NSLog(@"An error occured fetching the user's tracked weight. The error was: %@.", error);
+            return;
         }
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            for (HKQuantity *weightQuantity in results) {
+                [self.healthStore deleteObject:weightQuantity withCompletion:^(BOOL success, NSError *error) {
+                    if (success) {
+                        NSLog(@"Success deleted weight");
+                    }
+                    else {
+                        NSLog(@"delete: An error occured deleting weight. In your app, try to handle this gracefully. The error was: %@.", error);
+                    }
+                }];
+            }
+        });
     }];
     
     [self.healthStore executeQuery:query];
-    
 }
 
 
