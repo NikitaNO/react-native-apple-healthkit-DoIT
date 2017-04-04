@@ -196,6 +196,37 @@
     [self.healthStore executeQuery:query];
 }
 
+- (void)fitness_initializeWeightEventObserver:(NSDictionary *)input callback:(RCTResponseSenderBlock)callback
+{
+    HKSampleType *sampleType =
+    [HKObjectType quantityTypeForIdentifier:HKQuantityTypeIdentifierBodyMass];
+    
+    HKObserverQuery *query =
+    [[HKObserverQuery alloc]
+     initWithSampleType:sampleType
+     predicate:nil
+     updateHandler:^(HKObserverQuery *query,
+                     HKObserverQueryCompletionHandler completionHandler,
+                     NSError *error) {
+         
+         if (error) {
+             // Perform Proper Error Handling Here...
+             NSLog(@"*** An error occured while setting up the weight observer. %@ ***", error.localizedDescription);
+             callback(@[RCTMakeError(@"An error occured while setting up the weight observer", error, nil)]);
+             return;
+         }
+         
+         [self.bridge.eventDispatcher sendAppEventWithName:@"change:weight"
+                                                      body:@{@"name": @"change:weight"}];
+         
+         // If you have subscribed for background updates you must call the completion handler here.
+         // completionHandler();
+         
+     }];
+    
+    [self.healthStore executeQuery:query];
+}
+////////
 
 - (void)fitness_getDistanceWalkingRunningOnDay:(NSDictionary *)input callback:(RCTResponseSenderBlock)callback
 {
