@@ -114,6 +114,7 @@
     NSPredicate *predicate = [HKQuery predicateForSamplesWithStartDate:startDate endDate:endDate options:HKQueryOptionNone];
     HKSampleQuery *query = [[HKSampleQuery alloc] initWithSampleType:type predicate:predicate limit:HKObjectQueryNoLimit sortDescriptors:nil resultsHandler:^(HKSampleQuery *query, NSArray *results, NSError *error) {
         if (!results) {
+            callback(@[RCTMakeError(@"An error occured fetching the user's tracked weight", nil, nil)]);
             NSLog(@"An error occured fetching the user's tracked weight. The error was: %@.", error);
             return;
         }
@@ -122,10 +123,12 @@
             for (HKQuantity *weightQuantity in results) {
                 [self.healthStore deleteObject:weightQuantity withCompletion:^(BOOL success, NSError *error) {
                     if (success) {
+                        callback(@[[NSNull null], @{@"res":@"ok"}]);
                         NSLog(@"Success deleted weight");
                     }
                     else {
                         NSLog(@"delete: An error occured deleting weight. In your app, try to handle this gracefully. The error was: %@.", error);
+                        callback(@[RCTMakeError(@"An error occured deleting weight", nil, nil)]);
                     }
                 }];
             }
